@@ -1,5 +1,5 @@
 # geospatial_misc 
-Harmonize data from raster files for agricultural output, metereological data, soil quality, fertilizer use. 
+Harmonize data from raster files of different grid-cell resolution for agricultural output, metereological data, soil quality, fertilizer use. 
 
 Agricultural data from: [MapSPAM](https://mapspam.info/).
 
