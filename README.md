@@ -8,3 +8,6 @@ Extract from raster files:
 
 * Crop yield (41 crop types), production, physical area, and harvested area for different administrative levels (e.g., country, state- and county-equivalent)
 * Elevation, slope, aspect, soil quality, precipitation, temperature, fertilizer use, air quality, etc. 
+
+## loop_row.R 
+Same as above. 
