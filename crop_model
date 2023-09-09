@@ -1,0 +1,361 @@
+
+rm(list=ls())
+
+input <- read.table(file="Weather_DesMoines.csv", header=TRUE, sep=";",dec=".")
+# Average daily temperature (in °C)
+# (display only first values)
+head(input$T_DAILY_MEAN)
+
+data<-input%>%                  # Best practice: line break after %>%,
+  dplyr::select(                # then each new line indented by two spaces
+    tas = T_DAILY_MEAN,
+    rsds = SOLARAD_DAILY        # New name = Old name
+  )   
+head(data)
+
+data<-input%>%
+  dplyr::select(
+    tas = T_DAILY_MEAN,
+    rsds = SOLARAD_DAILY  
+  )%>% 
+  dplyr::mutate(                
+    day_number = row_number()     # Add a new column with day number
+  )
+
+head(data)
+
+day_sowing<-92                       # Sowing after 1st May
+day_harvest<-287                     # Harvest ~ mid-october
+
+data<-input%>%
+  dplyr::select(
+    tas = T_DAILY_MEAN,
+    rsds = SOLARAD_DAILY  
+  )%>% 
+  dplyr::mutate(                
+    day_number = row_number()     
+  )%>%
+  dplyr::filter(
+    day_number>=day_sowing,                  
+    day_number<=day_harvest
+  )
+
+head(data)
+
+ggplot2::ggplot(
+  data=data,                           # Name of the data frame to be used 
+  aes(x=day_number, y=tas)             # Specify x and y axis
+)+
+  geom_point()+                          # Add points to the plot
+  labs(                                  # Customize labels
+    title = "Temperature evolution",
+    x = "Day number",
+    y = "Mean T° (°C)"
+  )
+
+
+ggplot2::ggplot(
+  data=data,                           
+  aes(x=day_number, y=tas)    
+)+
+  geom_point(color="darkslategray3")+      # Change color of geom_point()
+  geom_smooth(color="darkslategray")+      # Add smoothing layer
+  labs(                                  
+    title = "Temperature evolution",
+    x = "Day number",
+    y = "Mean T° (°C)"
+  )
+
+T0<-6 # Set T0 for corn: 6°C
+
+model<-data%>%
+  dplyr::mutate(
+    TT=dplyr::case_when(
+      tas<T0~0,                 # Condition 1 ~ Column value
+      tas>=T0~tas-T0            # Condition 2 ~ Volumn value
+    )
+  )
+# Print first rows
+head(model)
+
+
+model<-data%>%
+  dplyr::mutate(
+    TT=dplyr::case_when(
+      tas<T0~0,
+      tas>=T0~tas-T0
+    )
+  )%>%  
+  mutate(
+    GDD = cumsum(TT)                   # Cumulative sum of thermal time
+  )
+# Print last rows
+tail(model)
+
+
+# Set parameters: 
+# Sum of T° for the emergence of 1 leaf
+GDD_1leaf<-50
+# Maximum number of leaves per plant
+max_nleaf<-20
+
+model<-data%>%
+  dplyr::mutate(
+    TT=dplyr::case_when(
+      tas<T0~0,
+      tas>=T0~tas-T0
+    )
+  )%>%  
+  mutate(
+    GDD = cumsum(TT)
+  )%>%
+  # Potential number of leaves (no max values)
+  mutate(
+    pot_nleaf = GDD/GDD_1leaf
+  )%>%
+  # Estimated number of leaves (including max)
+  mutate(
+    nleaf = case_when(
+      pot_nleaf<=max_nleaf~round(pot_nleaf),
+      pot_nleaf>max_nleaf~max_nleaf
+    )
+  )
+
+tail(model)
+
+ggplot2::ggplot(
+  data=model,                           
+  aes(x=day_number, y=nleaf)    
+)+
+  geom_point(color="forestgreen")+
+  labs(                                  
+    title = "Modelisation of the number of leaves",
+    x = "Day number",
+    y = "Number of leaves"
+  )
+
+
+
+function_name <- function(arguments) {
+  instructions
+  return(results)
+}
+
+
+model_fun <- function(
+    name,           # Scenario name 
+    data,           # Climatic variables to be used as inputs
+    GDD_1leaf       # Thermal requirement for the emergence of one leaf
+){      
+  
+  # Set parameters (without GDD_1leaf)
+  max_nleaf<-20
+  T0<-6 
+  # Estimate nleaf
+  model<-data%>%
+    dplyr::mutate(
+      TT=dplyr::case_when(
+        tas<T0~0,
+        tas>=T0~tas-T0
+      ))%>%  
+    mutate(
+      GDD = cumsum(TT)
+    )%>%
+    mutate(
+      pot_nleaf = GDD/GDD_1leaf
+    )%>%
+    mutate(
+      nleaf = case_when(
+        pot_nleaf<=max_nleaf~round(pot_nleaf),
+        pot_nleaf>max_nleaf~max_nleaf
+      )
+    )%>%
+    add_column(                                # To add scenario name to data
+      Scenario = name                          # (set 'name' in argument)
+    )
+  return(model)
+}
+
+# Test the function for baseline scenario
+baseline <- model_fun(name="Baseline",data=data,GDD_1leaf = 40)
+tail(baseline)
+
+baseline <- model_fun(
+  name="Baseline", data=data, GDD_1leaf = 50
+)
+breed <- model_fun(
+  name="Improved cultivar",data=data, GDD_1leaf = 40
+)
+
+comp<-rbind.data.frame(                         # Merging results 
+  baseline,                                     # before plotting
+  breed
+)
+
+ggplot(
+  data=comp, 
+  aes(x=day_number,y=nleaf,color=Scenario)    # Add color in aes()
+)+
+  geom_point()+
+  labs(                                  
+    title = "Comparison between two cultivars",
+    x = "Day number",
+    y = "Number of leaves"
+  )
+
+# Load second datafile 
+input_sandstone <- read.table(file="Weather_Sandstone.csv", header=TRUE, sep=";",dec=".")
+# Cleaning data
+data_sandstone<-input_sandstone%>%
+  dplyr::select(
+    tas = T_DAILY_MEAN,
+    rsds = SOLARAD_DAILY  
+  )%>% 
+  dplyr::mutate(                
+    day_number = row_number()     
+  )%>%
+  dplyr::filter(
+    day_number>=day_sowing,                  
+    day_number<=day_harvest               
+  )
+# Apply function for both datasets
+baseline <- model_fun(
+  name="DesMoines", data=data, GDD_1leaf = 50
+)
+sandstone <- model_fun(
+  name="Sandstone",data=data_sandstone, GDD_1leaf = 50
+)
+# Merging results before plotting
+comp<-rbind.data.frame(                         
+  baseline,                                     
+  sandstone
+)
+# Plotting
+ggplot(
+  data=comp, 
+  aes(x=day_number,y=nleaf,color=Scenario)    
+)+
+  geom_point()+
+  labs(                                  
+    title = "Comparison between two cities",
+    x = "Day number",
+    y = "Number of leaves"
+  )
+
+
+# Outside the function:
+# Required parameters to compute C
+# Light extinction coefficient
+K <- 0.56
+# Individual leaf area (m-2)
+S <- 0.05
+# Plant density (m-2)
+d <- 90000/10000
+
+# Model function
+model_fun <- function(
+    name,           # Scenario name 
+    data,           # Climatic variables to be used as inputs
+    GDD_1leaf,      # Thermal requirement for the emergence of one leaf
+    C,              # C=f(K,S,d)
+    RUE,            # Radiation use efficiency (gDM.MJ-1)
+    nthresh         # Number of leaves before grain filling
+){      
+  # Set parameters (without GDD_1leaf)
+  max_nleaf<-20
+  T0<-6 
+  f<-0.5      # Active fraction of incoming radiation
+  frac<-0.7   # Fraction of Net Primary Productivity dedicated to grain
+  
+  # Estimate yield
+  model<-data%>%
+    dplyr::mutate(
+      TT=dplyr::case_when(
+        tas<T0~0,
+        tas>=T0~tas-T0
+      ))%>%  
+    mutate(
+      GDD = cumsum(TT)
+    )%>%
+    mutate(
+      pot_nleaf = GDD/GDD_1leaf
+    )%>%
+    mutate(
+      nleaf = case_when(
+        pot_nleaf<=max_nleaf~round(pot_nleaf),
+        pot_nleaf>max_nleaf~max_nleaf
+      )
+    )%>%
+    # Incoming photosynthetic active radiation (MJ.m-2.day-1)
+    mutate(
+      PAR_inc = f*rsds
+    )%>%
+    # Absorbed PAR by the canopy (MJ.m-2.day-1)
+    mutate(
+      APAR = PAR_inc*(1-exp(-C*nleaf))
+    )%>%
+    # Net primary productivity dedicated to the aboveground biomass 
+    mutate(
+      NPP = RUE*APAR
+    )%>%
+    # Sum of aboveground biomass
+    mutate(
+      biom = cumsum(NPP)
+    )%>%
+    # Net primary productivity dedicated to the variable grain
+    mutate(
+      NPPgrain = case_when(
+        nleaf<nthresh ~ 0,
+        nleaf>=nthresh ~ frac*NPP
+      )
+    )%>%
+    # Total grain production (g.m-2)
+    mutate(
+      grain = cumsum(NPPgrain)
+    )%>%
+    # Total grain production (t.ha-1)
+    mutate(
+      grain_t = grain/100
+    )%>%
+    add_column(                                # To add scenario name to data
+      Scenario = name                          # (set 'name' in argument)
+    )
+  return(model)
+}
+
+
+# Apply function for both datasets
+baseline <- model_fun(
+  name="DesMoines", 
+  data=data, 
+  GDD_1leaf = 50,
+  C=K*S*d,
+  RUE=2,
+  nthresh = 16
+)
+sandstone <- model_fun(
+  name="Sandstone",
+  data=data_sandstone, 
+  GDD_1leaf = 50,
+  C=K*S*d,
+  RUE=2,
+  nthresh = 16
+)
+# Merging results before plotting
+comp<-rbind.data.frame(                         
+  baseline,                                     
+  sandstone
+)
+# Plotting
+ggplot(
+  data=comp, 
+  aes(x=day_number,y=grain_t,color=Scenario)    
+)+
+  geom_point()+
+  labs(                                  
+    title = "Comparison between two cities",
+    x = "Day number",
+    y = "Potential max yield (t.ha-1)"
+  )
+
+
